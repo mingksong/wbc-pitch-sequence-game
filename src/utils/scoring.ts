@@ -1,6 +1,7 @@
 import type { PitchOutcome, PitchRecord, AtBatOutcome, Zone } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
+import { RUN_VALUE_MATRIX } from '../data/runValueMatrix';
 
 // Score per pitch outcome (0-100)
 // Design: 5-at-bat game, "3 outs + 1K + 1 hit" → B grade
@@ -58,6 +59,64 @@ export function calculateTotalScore(atBats: AtBatSummary[]): number {
     const bonusScore = scoreAtBat(ab.outcome);
     return sum + pitchScore + bonusScore;
   }, 0);
+}
+
+// Catcher Lead Score — cumulative delta_run_exp from RUN_VALUE_MATRIX
+export interface LeadScoreResult {
+  totalDRE: number;       // cumulative delta_run_exp (negative = good)
+  label: string;          // Korean label
+  grade: string;          // emoji indicator
+}
+
+// Calculate catcher lead score from pitch history across all at-bats
+// Each pitch's (count, actualZone) is looked up in RUN_VALUE_MATRIX
+export function calculateLeadScore(atBats: AtBatSummary[]): LeadScoreResult {
+  let totalDRE = 0;
+  let pitchCount = 0;
+
+  for (const ab of atBats) {
+    let balls = 0;
+    let strikes = 0;
+
+    for (const pitch of ab.pitchHistory) {
+      const countKey = `${balls}-${strikes}`;
+      const zoneValues = RUN_VALUE_MATRIX[countKey];
+      if (zoneValues) {
+        const dre = zoneValues[pitch.actualZone] ?? 0;
+        totalDRE += dre;
+      }
+      pitchCount++;
+
+      // Update count for next pitch lookup
+      if (pitch.outcome === 'called_strike' || pitch.outcome === 'swinging_strike') {
+        strikes = Math.min(strikes + 1, 2); // cap at 2 since 3 = strikeout ends AB
+      } else if (pitch.outcome === 'foul') {
+        if (strikes < 2) strikes++;
+      } else if (pitch.outcome === 'ball') {
+        balls = Math.min(balls + 1, 3); // cap at 3 since 4 = walk ends AB
+      }
+      // in-play outcomes end AB, so no need to update count
+    }
+  }
+
+  // Classify lead quality
+  let label: string;
+  let grade: string;
+  if (totalDRE <= -0.5) {
+    label = 'MLB급 리드';
+    grade = '\u2B50'; // star
+  } else if (totalDRE <= -0.2) {
+    label = '안정적 리드';
+    grade = '\uD83D\uDFE2'; // green circle
+  } else if (totalDRE <= 0) {
+    label = '무난한 리드';
+    grade = '\uD83D\uDFE1'; // yellow circle
+  } else {
+    label = '위험한 리드';
+    grade = '\uD83D\uDD34'; // red circle
+  }
+
+  return { totalDRE: Math.round(totalDRE * 1000) / 1000, label, grade };
 }
 
 // Max scores:
@@ -123,6 +182,7 @@ export function generateShareText(
   mode: 'japan' | 'dom' = 'japan',
   pitcherName?: string,
   isHard: boolean = false,
+  leadScore?: LeadScoreResult,
 ): string {
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
   const maxScore = mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
@@ -142,6 +202,8 @@ export function generateShareText(
 
   const scoreText = `최종: ${grade}등급 | ${totalScore.toLocaleString()}점`;
 
+  const leadLine = leadScore ? `포수 리드: ${leadScore.grade} ${leadScore.label} (${leadScore.totalDRE > 0 ? '+' : ''}${leadScore.totalDRE.toFixed(3)})` : '';
+
   return [
     ...header.filter(Boolean),
     '',
@@ -149,6 +211,7 @@ export function generateShareText(
     '',
     scoreText,
     `"${label}"`,
+    ...(leadLine ? [leadLine] : []),
     '',
     '나도 도전 \u2192 [URL]',
   ].join('\n');

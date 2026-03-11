@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AtBatOutcome, PitchOutcome, Difficulty } from '../data/types';
 import type { AtBatSummary } from '../utils/scoring';
 import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE } from '../utils/scoring';
+import type { LeadScoreResult } from '../utils/scoring';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 
@@ -12,6 +13,7 @@ interface GameResultProps {
   onRestart: () => void;
   gameMode?: 'japan' | 'dom';
   pitcherName?: string;
+  leadScore?: LeadScoreResult;
 }
 
 function pitchEmoji(outcome: PitchOutcome): string {
@@ -59,7 +61,7 @@ function gradeColor(grade: string): string {
   }
 }
 
-export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName }: GameResultProps) {
+export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore }: GameResultProps) {
   const [copied, setCopied] = useState(false);
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
   const maxScore = gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
@@ -68,7 +70,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
   const pct = Math.round((totalScore / maxScore) * 100);
 
   const handleCopy = async () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
     const ok = await copyShareText(text);
     if (ok) {
       setCopied(true);
@@ -77,13 +79,13 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
   };
 
   const handleShareX = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleShareThreads = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
     const url = `https://www.threads.net/intent/post?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -119,6 +121,22 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
           </div>
           <p className="text-slate-500 text-xs mt-1">{pct}%</p>
         </div>
+
+        {/* Catcher Lead Score */}
+        {leadScore && (
+          <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 mb-6 text-center">
+            <p className="text-slate-400 text-xs mb-1">포수 리드 지수</p>
+            <p className="text-xl font-bold text-white">
+              {leadScore.grade} {leadScore.label}
+            </p>
+            <p className={`text-sm mt-0.5 ${leadScore.totalDRE <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              dRE: {leadScore.totalDRE > 0 ? '+' : ''}{leadScore.totalDRE.toFixed(3)}
+            </p>
+            <p className="text-slate-500 text-[10px] mt-1">
+              음수일수록 투수에게 유리한 배합
+            </p>
+          </div>
+        )}
 
         {/* At-bat summaries */}
         <div className="space-y-2 mb-6">

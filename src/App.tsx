@@ -20,7 +20,7 @@ import { DOM_BATTER_PROFILES } from './data/domBatterProfiles';
 import { DOM_LINEUPS } from './data/domLineups';
 import { KOR_PITCHERS } from './data/korPitcherProfiles';
 import { determinePitchOutcome, generatePitchTrajectory } from './engine/outcomeEngine';
-import { scorePitch, scoreAtBat, calculateTotalScore } from './utils/scoring';
+import { scorePitch, scoreAtBat, calculateTotalScore, calculateLeadScore } from './utils/scoring';
 import type { AtBatSummary } from './utils/scoring';
 import GameIntro from './components/GameIntro';
 import PitchSelector from './components/PitchSelector';
@@ -487,6 +487,7 @@ export default function App() {
 
     case 'game_result': {
       const total = calculateTotalScore(completedAtBats);
+      const leadScore = calculateLeadScore(completedAtBats);
       return (
         <GameResult
           atBats={completedAtBats}
@@ -495,6 +496,7 @@ export default function App() {
           onRestart={handleRestart}
           gameMode={gameMode}
           pitcherName={selectedPitcher?.nameKo}
+          leadScore={leadScore}
         />
       );
     }

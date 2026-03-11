@@ -3,3 +3,5 @@ dist
 .DS_Store
 *.local
 .omc
+scripts/cache/
+scripts/__pycache__/
