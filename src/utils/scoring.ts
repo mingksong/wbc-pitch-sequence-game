@@ -122,14 +122,16 @@ export function generateShareText(
   totalScore: number,
   mode: 'japan' | 'dom' = 'japan',
   pitcherName?: string,
+  isHard: boolean = false,
 ): string {
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
   const maxScore = mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
   const { grade, label } = getGrade(totalScore, maxScore);
 
+  const hardTag = isHard ? ' [\uD83D\uDD25하드모드]' : '';
   const header = mode === 'japan'
-    ? ['\u26BE 답답하면 니가 던지던가', '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026']
-    : ['\u26BE 도전! 도미니카!', '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
+    ? [`\u26BE 답답하면 니가 던지던가${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026']
+    : [`\u26BE 도전! 도미니카!${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
 
   const lines = atBats.map((ab) => {
     const batter = allProfiles[ab.batterId];
@@ -138,12 +140,14 @@ export function generateShareText(
     return `${batter?.nameKo || ab.batterId}: ${emojis}  ${result}`;
   });
 
+  const scoreText = `최종: ${grade}등급 | ${totalScore.toLocaleString()}점`;
+
   return [
     ...header.filter(Boolean),
     '',
     ...lines,
     '',
-    `최종: ${grade}등급 | ${totalScore.toLocaleString()}점`,
+    scoreText,
     `"${label}"`,
     '',
     '나도 도전 \u2192 [URL]',

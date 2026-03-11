@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type {
   GamePhase,
   GameMode,
+  Difficulty,
   AtBatState,
   Zone,
   PitchOutcome,
@@ -31,6 +32,8 @@ import HUD from './components/HUD';
 import ModeSelect from './components/ModeSelect';
 import PitcherSelect from './components/PitcherSelect';
 import LineupSelect from './components/LineupSelect';
+import DifficultySelect from './components/DifficultySelect';
+import MissNotify from './components/MissNotify';
 
 const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
 
@@ -91,6 +94,7 @@ function updateCount(
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>('mode_select');
   const [gameMode, setGameMode] = useState<GameMode>('japan');
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [selectedPitcher, setSelectedPitcher] = useState<KorPitcherProfile | null>(null);
   const [selectedLineup, setSelectedLineup] = useState<DomLineup | null>(null);
   const [atBat, setAtBat] = useState<AtBatState>({
@@ -106,6 +110,7 @@ export default function App() {
     outcome: PitchOutcome;
     pitchCode: string;
     zone: Zone;
+    actualZone: Zone;
     newBalls: number;
     newStrikes: number;
   } | null>(null);
@@ -136,11 +141,20 @@ export default function App() {
   // Handlers
   const handleSelectMode = useCallback((mode: GameMode) => {
     setGameMode(mode);
-    if (mode === 'japan') {
+    setPhase('difficulty_select');
+  }, []);
+
+  const handleSelectDifficulty = useCallback((diff: Difficulty) => {
+    setDifficulty(diff);
+    if (gameMode === 'japan') {
       setPhase('intro');
     } else {
       setPhase('pitcher_select');
     }
+  }, [gameMode]);
+
+  const handleBackToModeSelectFromDifficulty = useCallback(() => {
+    setPhase('mode_select');
   }, []);
 
   const handleSelectPitcher = useCallback((p: KorPitcherProfile) => {
@@ -173,24 +187,32 @@ export default function App() {
     (pitchCode: string, zone: Zone) => {
       if (!batter || !pitcher) return;
 
-      // Determine outcome — works for both modes since outcomeEngine checks both profile maps
-      const outcome = determinePitchOutcome(
+      // Find the selected pitch option for speed
+      const pitchOption = pitcher.pitches.find((p) => p.code === pitchCode);
+      const avgSpeed = pitchOption?.avgSpeed || 90;
+
+      // Build hard mode context if applicable
+      const hardCtx = difficulty === 'hard' ? {
+        pitchHistory: atBat.pitchHistory,
+        pitchSpeed: avgSpeed,
+        difficulty,
+      } : undefined;
+
+      // Determine outcome with hard mode support
+      const { outcome, actualZone } = determinePitchOutcome(
         batter.id,
         pitchCode,
         zone,
         atBat.balls,
         atBat.strikes,
+        hardCtx,
       );
 
-      // Find the selected pitch option for speed
-      const pitchOption = pitcher.pitches.find((p) => p.code === pitchCode);
-      const avgSpeed = pitchOption?.avgSpeed || 90;
-
-      // Generate trajectory — switch hitters default to R side for animation
+      // Generate trajectory — use actualZone for animation target
       const batSide = batter.bats === 'S' ? 'R' : batter.bats;
       const trajectory = generatePitchTrajectory(
         pitchCode,
-        zone,
+        actualZone,
         avgSpeed,
         pitcher.hand,
         batSide,
@@ -204,13 +226,24 @@ export default function App() {
         outcome,
         pitchCode,
         zone,
+        actualZone,
         newBalls: newCount.balls,
         newStrikes: newCount.strikes,
       });
-      setPhase('animating');
+
+      // Show miss notification before animation if pitch missed target zone
+      if (difficulty === 'hard' && actualZone !== zone) {
+        setPhase('miss_notify');
+      } else {
+        setPhase('animating');
+      }
     },
-    [batter, pitcher, atBat.balls, atBat.strikes],
+    [batter, pitcher, atBat.balls, atBat.strikes, difficulty],
   );
+
+  const handleMissNotifyDone = useCallback(() => {
+    setPhase('animating');
+  }, []);
 
   const handleAnimationComplete = useCallback(() => {
     setPhase('outcome');
@@ -219,11 +252,11 @@ export default function App() {
   const handleOutcomeNext = useCallback(() => {
     if (!lastOutcome) return;
 
-    const { outcome, pitchCode, zone, newBalls, newStrikes } = lastOutcome;
-    const pitchScore = scorePitch(outcome, zone);
+    const { outcome, pitchCode, zone, actualZone, newBalls, newStrikes } = lastOutcome;
+    const pitchScore = scorePitch(outcome, actualZone);
 
-    // Add pitch to history
-    const newPitch = { pitchCode, zone, outcome, score: pitchScore };
+    // Add pitch to history (includes actualZone for hard mode tracking)
+    const newPitch = { pitchCode, zone, actualZone, outcome, score: pitchScore };
     const newHistory = [...atBat.pitchHistory, newPitch];
 
     // Check if at-bat is over
@@ -299,6 +332,7 @@ export default function App() {
   const handleRestart = useCallback(() => {
     setPhase('mode_select');
     setGameMode('japan');
+    setDifficulty('normal');
     setSelectedPitcher(null);
     setSelectedLineup(null);
     setAtBat({
@@ -318,6 +352,15 @@ export default function App() {
   switch (phase) {
     case 'mode_select':
       return <ModeSelect onSelectMode={handleSelectMode} />;
+
+    case 'difficulty_select':
+      return (
+        <DifficultySelect
+          gameMode={gameMode}
+          onSelect={handleSelectDifficulty}
+          onBack={handleBackToModeSelectFromDifficulty}
+        />
+      );
 
     case 'intro':
       return <GameIntro onStart={handleStart} />;
@@ -366,6 +409,16 @@ export default function App() {
         </>
       );
 
+    case 'miss_notify':
+      if (!batter || !pitcher || !lastOutcome) return null;
+      return (
+        <MissNotify
+          targetZone={lastOutcome.zone}
+          actualZone={lastOutcome.actualZone}
+          onDone={handleMissNotifyDone}
+        />
+      );
+
     case 'animating':
       if (!batter || !pitcher || !currentTrajectory) return null;
       return (
@@ -408,6 +461,8 @@ export default function App() {
             outcome={lastOutcome.outcome}
             pitchCode={lastOutcome.pitchCode}
             zone={lastOutcome.zone}
+            actualZone={lastOutcome.actualZone}
+            difficulty={difficulty}
             batterProfile={batter}
             balls={lastOutcome.newBalls}
             strikes={lastOutcome.newStrikes}
@@ -436,6 +491,7 @@ export default function App() {
         <GameResult
           atBats={completedAtBats}
           totalScore={total}
+          difficulty={difficulty}
           onRestart={handleRestart}
           gameMode={gameMode}
           pitcherName={selectedPitcher?.nameKo}

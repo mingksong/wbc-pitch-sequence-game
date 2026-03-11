@@ -1,10 +1,12 @@
-import type { PitchOutcome, Zone, BatterProfile } from '../data/types';
+import type { PitchOutcome, Zone, BatterProfile, Difficulty } from '../data/types';
 import { getPitchNameKo } from '../utils/pitchColors';
 
 interface OutcomeDisplayProps {
   outcome: PitchOutcome;
   pitchCode: string;
   zone: Zone;
+  actualZone?: Zone;
+  difficulty?: Difficulty;
   batterProfile: BatterProfile;
   balls: number;
   strikes: number;
@@ -77,14 +79,18 @@ export default function OutcomeDisplay({
   outcome,
   pitchCode,
   zone,
+  actualZone,
+  difficulty,
   batterProfile,
   balls,
   strikes,
   onNext,
 }: OutcomeDisplayProps) {
   const style = getOutcomeStyle(outcome);
-  const insight = getInsight(outcome, pitchCode, zone, batterProfile);
+  const displayZone = actualZone ?? zone;
+  const insight = getInsight(outcome, pitchCode, displayZone, batterProfile);
   const pitchName = getPitchNameKo(pitchCode);
+  const isMiss = difficulty === 'hard' && actualZone !== undefined && actualZone !== zone;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
@@ -99,8 +105,13 @@ export default function OutcomeDisplay({
         <div className="bg-slate-900/50 rounded-lg px-4 py-3 mb-4">
           <p className="text-slate-400 text-xs mb-1">투구 정보</p>
           <p className="text-white font-medium">
-            {pitchName} - {getZoneLabel(zone)}
+            {pitchName} - {getZoneLabel(displayZone)}
           </p>
+          {isMiss && (
+            <p className="text-red-400 text-xs mt-1">
+              &#x26A0; 빗나감! (목표: {getZoneLabel(zone)} &#x2192; 실제: {getZoneLabel(actualZone)})
+            </p>
+          )}
         </div>
 
         {/* Current count */}

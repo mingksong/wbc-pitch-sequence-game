@@ -3,6 +3,15 @@
 // 11-14: Shadow zones (outside strike zone, chase pitches)
 export type Zone = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11 | 12 | 13 | 14;
 
+// Difficulty level
+export type Difficulty = 'normal' | 'hard';
+
+// Velocity band stats for hard mode (3mph bands)
+export interface VelocityBandStats {
+  ba: number;   // batting average
+  slg: number;  // slugging percentage
+}
+
 export interface ZoneStats {
   wOBA: number;
   swingRate: number;
@@ -97,10 +106,12 @@ export type GameMode = 'japan' | 'dom';
 // DOM-specific game phase adds mode_select, pitcher_select, lineup_select
 export type GamePhase =
   | 'mode_select'
+  | 'difficulty_select'
   | 'intro'
   | 'pitcher_select'
   | 'lineup_select'
   | 'pitch_select'
+  | 'miss_notify'
   | 'animating'
   | 'outcome'
   | 'at_bat_result'
@@ -137,6 +148,7 @@ export interface AtBatState {
 export interface PitchRecord {
   pitchCode: string;
   zone: Zone;
+  actualZone: Zone;  // Hard mode: actual landing zone after location variance
   outcome: PitchOutcome;
   score: number;
 }

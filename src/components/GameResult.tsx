@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AtBatOutcome, PitchOutcome } from '../data/types';
+import type { AtBatOutcome, PitchOutcome, Difficulty } from '../data/types';
 import type { AtBatSummary } from '../utils/scoring';
 import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE } from '../utils/scoring';
 import { BATTER_PROFILES } from '../data/batterProfiles';
@@ -8,6 +8,7 @@ import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 interface GameResultProps {
   atBats: AtBatSummary[];
   totalScore: number;
+  difficulty?: Difficulty;
   onRestart: () => void;
   gameMode?: 'japan' | 'dom';
   pitcherName?: string;
@@ -58,15 +59,16 @@ function gradeColor(grade: string): string {
   }
 }
 
-export default function GameResult({ atBats, totalScore, onRestart, gameMode, pitcherName }: GameResultProps) {
+export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName }: GameResultProps) {
   const [copied, setCopied] = useState(false);
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
   const maxScore = gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const isHard = difficulty === 'hard';
   const { grade, label } = getGrade(totalScore, maxScore);
   const pct = Math.round((totalScore / maxScore) * 100);
 
   const handleCopy = async () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
     const ok = await copyShareText(text);
     if (ok) {
       setCopied(true);
@@ -75,13 +77,13 @@ export default function GameResult({ atBats, totalScore, onRestart, gameMode, pi
   };
 
   const handleShareX = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleShareThreads = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard);
     const url = `https://www.threads.net/intent/post?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -92,11 +94,14 @@ export default function GameResult({ atBats, totalScore, onRestart, gameMode, pi
         {/* Title */}
         <h2 className="text-center text-lg text-slate-400 mb-1">
           {gameMode === 'dom' ? '도미니카 챌린지 결과' : '오늘의 포수 성적표'}
+          {isHard && <span className="ml-1 text-red-400">&#x1F525; 하드모드</span>}
         </h2>
 
         {/* Grade */}
         <div className="text-center mb-6">
-          <p className={`text-7xl font-black ${gradeColor(grade)} mb-1`}>{grade}</p>
+          <p className={`text-7xl font-black ${gradeColor(grade)} mb-1`}>
+            {grade}{isHard ? ' \uD83D\uDD25' : ''}
+          </p>
           <p className="text-slate-300 font-medium text-lg">{label}</p>
         </div>
 

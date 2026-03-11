@@ -1,6 +1,12 @@
-import type { Zone, PitchOutcome, PitchTrajectory } from '../data/types';
+import type { Zone, PitchOutcome, PitchTrajectory, PitchRecord, Difficulty } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
+import {
+  getPitchRepeatModifier,
+  getZoneRepeatModifier,
+  getVelocityBandModifier,
+  applyLocationVariance,
+} from './hardModeEngine';
 
 // Strike zone: zones 1-9 are IN the zone, 11-14 are OUTSIDE
 const STRIKE_ZONES: Zone[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -36,6 +42,13 @@ function getCountAdjustment(balls: number, strikes: number): CountAdjustment {
   return { swingMod: 1.0, chaseMod: 1.0, patience: 1.0 };
 }
 
+// Hard mode context passed from App
+export interface HardModeContext {
+  pitchHistory: PitchRecord[];
+  pitchSpeed: number;
+  difficulty: Difficulty;
+}
+
 // Main outcome determination
 export function determinePitchOutcome(
   batterId: string,
@@ -43,23 +56,49 @@ export function determinePitchOutcome(
   zone: Zone,
   balls: number,
   strikes: number,
-): PitchOutcome {
+  hardModeContext?: HardModeContext,
+): { outcome: PitchOutcome; actualZone: Zone } {
   const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId];
   if (!batter) throw new Error(`Unknown batter: ${batterId}`);
 
-  const zoneStats = batter.zones[zone];
+  const isHard = hardModeContext?.difficulty === 'hard';
+
+  // Step 0 (Hard mode): Apply location variance
+  let actualZone = zone;
+  if (isHard) {
+    const variance = applyLocationVariance(zone);
+    actualZone = variance.actualZone;
+  }
+
+  // Use actualZone for all subsequent calculations
+  const zoneStats = batter.zones[actualZone];
   const pitchStats = batter.pitchTypeStats[pitchCode] || { ba: 0.220, whiffRate: 0.25 };
   const countAdj = getCountAdjustment(balls, strikes);
-  const inZone = isStrikeZone(zone);
+  const inZone = isStrikeZone(actualZone);
+
+  // Hard mode modifiers
+  let pitchRepeatMod = 1.0;
+  let zoneRepeatContact = 1.0;
+  let zoneRepeatWhiff = 1.0;
+  let velBaMod = 1.0;
+  let velSlgMod = 1.0;
+
+  if (isHard && hardModeContext) {
+    pitchRepeatMod = getPitchRepeatModifier(pitchCode, hardModeContext.pitchHistory);
+    const zoneRepeat = getZoneRepeatModifier(actualZone, hardModeContext.pitchHistory);
+    zoneRepeatContact = zoneRepeat.contactMod;
+    zoneRepeatWhiff = zoneRepeat.whiffMod;
+    const velMod = getVelocityBandModifier(batterId, hardModeContext.pitchSpeed);
+    velBaMod = velMod.baMod;
+    velSlgMod = velMod.slgMod;
+  }
 
   // Step 1: Does the batter swing?
   let swingProb: number;
   if (inZone) {
     swingProb = zoneStats.swingRate * countAdj.swingMod;
-    // Reduce swing on pitcher's pitch types with high whiff rates in favorable counts
     swingProb = Math.min(swingProb, 0.95);
   } else {
-    // Chase rate: base swing rate on ball zones, modified by count
     swingProb = zoneStats.swingRate * countAdj.chaseMod;
     swingProb = Math.min(swingProb, 0.85);
   }
@@ -68,59 +107,73 @@ export function determinePitchOutcome(
 
   // Step 2: No swing
   if (!doesSwing) {
-    return inZone ? 'called_strike' : 'ball';
+    return { outcome: inZone ? 'called_strike' : 'ball', actualZone };
   }
 
   // Step 3: Swing → check whiff (swinging strike)
-  // Combine zone whiff rate and pitch type whiff rate
   const combinedWhiff = (zoneStats.whiffRate * 0.6 + pitchStats.whiffRate * 0.4);
-  // Ball zones have naturally higher whiff rates
-  const whiffProb = inZone ? combinedWhiff : combinedWhiff * 1.3;
+  // Apply hard mode: zone repeat reduces whiff, pitch repeat affects overall
+  let whiffProb = inZone ? combinedWhiff : combinedWhiff * 1.3;
+  if (isHard) {
+    whiffProb *= zoneRepeatWhiff;      // zone repeat → less whiff
+    whiffProb *= (1 / pitchRepeatMod); // pitch repeat batter advantage → less whiff
+  }
 
   if (Math.random() < whiffProb) {
-    return 'swinging_strike';
+    return { outcome: 'swinging_strike', actualZone };
   }
 
   // Step 4: Contact made → determine result
-  // Foul ball probability (higher on 2-strike counts, corner zones)
   const cornerZones: Zone[] = [1, 3, 7, 9, 11, 12, 13, 14];
-  const isCorner = cornerZones.includes(zone);
+  const isCorner = cornerZones.includes(actualZone);
   let foulProb = isCorner ? 0.45 : 0.30;
-  if (strikes === 2) foulProb += 0.15; // protective swings → more fouls
+  if (strikes === 2) foulProb += 0.15;
+  // Hard mode: zone repeat → better contact → fewer fouls
+  if (isHard) {
+    foulProb *= (1 / zoneRepeatContact);
+  }
 
   if (Math.random() < foulProb) {
-    return 'foul';
+    return { outcome: 'foul', actualZone };
   }
 
   // Step 5: Ball in play → determine hit quality
-  // Use wOBA as a proxy for quality of contact
   const wOBA = zoneStats.wOBA;
   const hrRate = zoneStats.hrRate;
-  const ba = pitchStats.ba;
+  let ba = pitchStats.ba;
 
-  // Homerun check (zone HR rate weighted by pitch vulnerability)
-  const hrProb = hrRate * (ba / 0.260); // scale by how well batter hits this pitch type
-  if (Math.random() < hrProb) {
-    return 'homerun';
+  // Hard mode: apply velocity band + pitch repeat modifiers to BA
+  if (isHard) {
+    ba *= velBaMod * pitchRepeatMod * zoneRepeatContact;
   }
 
-  // Hit vs out determination based on wOBA
-  // wOBA > 0.370 is excellent, < 0.300 is poor
-  const hitProb = (wOBA * 0.6 + ba * 0.4); // blend zone quality and pitch type matchup
+  // Homerun check
+  let hrProb = hrRate * (ba / 0.260);
+  if (isHard) {
+    hrProb *= velSlgMod; // velocity band affects power
+  }
+  if (Math.random() < hrProb) {
+    return { outcome: 'homerun', actualZone };
+  }
+
+  // Hit vs out
+  let hitProb = (wOBA * 0.6 + ba * 0.4);
+  if (isHard) {
+    hitProb *= pitchRepeatMod; // repeated pitches → easier to hit
+  }
 
   if (Math.random() < hitProb) {
-    // Hit type distribution
     const r = Math.random();
-    if (r < 0.05) return 'triple';
-    if (r < 0.30) return 'double';
-    return 'single';
+    if (r < 0.05) return { outcome: 'triple', actualZone };
+    if (r < 0.30) return { outcome: 'double', actualZone };
+    return { outcome: 'single', actualZone };
   }
 
   // Out type distribution
   const outRoll = Math.random();
-  if (outRoll < 0.45) return 'groundout';
-  if (outRoll < 0.80) return 'flyout';
-  return 'lineout';
+  if (outRoll < 0.45) return { outcome: 'groundout', actualZone };
+  if (outRoll < 0.80) return { outcome: 'flyout', actualZone };
+  return { outcome: 'lineout', actualZone };
 }
 
 // Generate a representative pitch trajectory for 3D animation
