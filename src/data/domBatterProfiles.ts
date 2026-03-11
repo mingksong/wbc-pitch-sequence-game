@@ -166,6 +166,40 @@ export const DOM_BATTER_PROFILES: Record<string, BatterProfile> = {
     },
   },
 
+  caminero: {
+    id: 'caminero',
+    name: 'Junior Caminero',
+    nameKo: '주니어 카미네로',
+    bats: 'R',
+    team: 'Dominican Republic',
+    flavorText: '젊은 유망주. 빠른 직구에 적극적이다.',
+    zones: {
+      1:  z(0.340, 0.72, 0.22, 0.78, 0.035),  // high inside
+      2:  z(0.350, 0.74, 0.20, 0.80, 0.040),  // high middle
+      3:  z(0.330, 0.70, 0.24, 0.76, 0.030),  // high outside
+      4:  z(0.320, 0.68, 0.23, 0.77, 0.032),  // middle inside
+      5:  z(0.360, 0.76, 0.18, 0.82, 0.045),  // dead center
+      6:  z(0.310, 0.66, 0.25, 0.75, 0.028),  // middle outside
+      7:  z(0.280, 0.62, 0.28, 0.72, 0.022),  // low inside
+      8:  z(0.300, 0.64, 0.26, 0.74, 0.025),  // low middle
+      9:  z(0.270, 0.60, 0.30, 0.70, 0.020),  // low outside
+      11: z(0.180, 0.35, 0.42, 0.58, 0.010),  // 하이볼
+      12: z(0.200, 0.38, 0.40, 0.60, 0.012),  // 로우볼
+      13: z(0.190, 0.32, 0.45, 0.55, 0.008),  // 왼쪽 유인구
+      14: z(0.170, 0.30, 0.48, 0.52, 0.006),  // 오른쪽 유인구
+    } as Record<Zone, ZoneStats>,
+    pitchTypeStats: {
+      FF: { ba: 0.260, whiffRate: 0.20 },
+      SI: { ba: 0.270, whiffRate: 0.18 },
+      SL: { ba: 0.230, whiffRate: 0.32 },
+      CU: { ba: 0.220, whiffRate: 0.35 },
+      CH: { ba: 0.240, whiffRate: 0.30 },
+      FC: { ba: 0.250, whiffRate: 0.25 },
+      FS: { ba: 0.235, whiffRate: 0.33 },
+      ST: { ba: 0.225, whiffRate: 0.34 },
+    },
+  },
+
   jrod: {
     id: 'jrod',
     name: 'Julio Rodriguez',

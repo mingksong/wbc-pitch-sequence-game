@@ -180,6 +180,28 @@ const machado: BatterVelocityProfile = {
   },
 };
 
+const caminero: BatterVelocityProfile = {
+  avgBA: 0.250,
+  avgSLG: 0.410,
+  bands: {
+    '60-62':  { ba: 0.250, slg: 0.350 },
+    '63-65':  { ba: 0.250, slg: 0.350 },
+    '66-68':  { ba: 0.250, slg: 0.360 },
+    '69-71':  { ba: 0.245, slg: 0.370 },
+    '72-74':  { ba: 0.240, slg: 0.380 },
+    '75-77':  { ba: 0.245, slg: 0.390 },
+    '78-80':  { ba: 0.250, slg: 0.400 },
+    '81-83':  { ba: 0.255, slg: 0.410 },
+    '84-86':  { ba: 0.260, slg: 0.420 },
+    '87-89':  { ba: 0.265, slg: 0.430 },
+    '90-92':  { ba: 0.260, slg: 0.420 },
+    '93-95':  { ba: 0.250, slg: 0.410 },
+    '96-98':  { ba: 0.240, slg: 0.390 },
+    '99-101': { ba: 0.230, slg: 0.370 },
+    '102-105': { ba: 0.220, slg: 0.350 },
+  },
+};
+
 const jrod: BatterVelocityProfile = {
   avgBA: 0.274, avgSLG: 0.47,
   bands: {
@@ -378,6 +400,7 @@ export const VELOCITY_BAND_DATA: Record<string, BatterVelocityProfile> = {
   tatis,
   guerrero,
   machado,
+  caminero,
   jrod,
   marte,
   pena,
