@@ -1,4 +1,5 @@
 import type { Zone } from '../data/types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ZoneHeatmapProps {
   onZoneSelect?: (zone: Zone) => void;
@@ -12,14 +13,6 @@ const SIZE_MAP = {
   sm: { cell: 'w-10 h-10 text-[10px]', shadow: 'w-10 h-8 text-[10px]', sideW: 'w-8', gap: 'gap-0.5' },
   md: { cell: 'w-14 h-14 text-xs', shadow: 'w-14 h-10 text-[10px]', sideW: 'w-10', gap: 'gap-1' },
   lg: { cell: 'w-20 h-20 text-sm', shadow: 'w-20 h-12 text-xs', sideW: 'w-12', gap: 'gap-1' },
-};
-
-// Zone labels from pitcher's perspective
-const ZONE_LABELS: Record<number, string> = {
-  1: '높은\n글러브', 2: '높은\n가운데', 3: '높은\n팔쪽',
-  4: '중간\n글러브', 5: '한가운데', 6: '중간\n팔쪽',
-  7: '낮은\n글러브', 8: '낮은\n가운데', 9: '낮은\n팔쪽',
-  11: '하이볼', 12: '로우볼', 13: '왼쪽\n유인구', 14: '오른쪽\n유인구',
 };
 
 function ZoneButton({
@@ -68,7 +61,17 @@ export default function ZoneHeatmap({
   size = 'md',
   batSide,
 }: ZoneHeatmapProps) {
+  const { t } = useLanguage();
   const s = SIZE_MAP[size];
+
+  // Zone labels (computed inside component so t() can be used)
+  const zoneLabels: Record<number, string> = {
+    1: t('zoneMap.1'), 2: t('zoneMap.2'), 3: t('zoneMap.3'),
+    4: t('zoneMap.4'), 5: t('zoneMap.5'), 6: t('zoneMap.6'),
+    7: t('zoneMap.7'), 8: t('zoneMap.8'), 9: t('zoneMap.9'),
+    11: t('zoneMap.11'), 12: t('zoneMap.12'),
+    13: t('zoneMap.13'), 14: t('zoneMap.14'),
+  };
 
   // Pitcher's perspective: mirror horizontally from catcher view
   // Catcher [1,2,3] → Pitcher [3,2,1]
@@ -84,13 +87,13 @@ export default function ZoneHeatmap({
   //   Pitcher's right (our grid right) = 1B side
   // RHB stands on 1B side → 인코스 = right, 아웃코스 = left
   // LHB stands on 3B side → 인코스 = left, 아웃코스 = right
-  const leftLabel = batSide === 'L' ? '인코스' : '아웃코스';
-  const rightLabel = batSide === 'L' ? '아웃코스' : '인코스';
+  const leftLabel = batSide === 'L' ? t('zoneMap.inside') : t('zoneMap.outside');
+  const rightLabel = batSide === 'L' ? t('zoneMap.outside') : t('zoneMap.inside');
 
   return (
     <div className="inline-flex flex-col items-center">
       {/* Pitcher's view label */}
-      <p className="text-slate-500 text-[10px] mb-2 tracking-wider">PITCHER VIEW</p>
+      <p className="text-slate-500 text-[10px] mb-2 tracking-wider">{t('zoneMap.pitcherView')}</p>
 
       {/* Shadow top: zone 11 하이볼 */}
       <div className={`flex ${s.gap} justify-center mb-1`}>
@@ -101,13 +104,13 @@ export default function ZoneHeatmap({
           selected={selectedZone === 11}
           onSelect={onZoneSelect}
           isShadow
-          label={ZONE_LABELS[11]}
+          label={zoneLabels[11]}
         />
       </div>
 
       {/* Main grid with side shadow zones */}
       <div className={`flex items-center ${s.gap}`}>
-        {/* Left shadow: zone 13 왼쪽 유인구 */}
+        {/* Left shadow: zone 13 */}
         <div className="flex flex-col items-center gap-0.5">
           <span className="text-[9px] text-slate-500 mb-0.5">{leftLabel}</span>
           <ZoneButton
@@ -117,7 +120,7 @@ export default function ZoneHeatmap({
             selected={selectedZone === 13}
             onSelect={onZoneSelect}
             isShadow
-            label={ZONE_LABELS[13]}
+            label={zoneLabels[13]}
           />
         </div>
 
@@ -134,14 +137,14 @@ export default function ZoneHeatmap({
                   selected={selectedZone === zone}
                   onSelect={onZoneSelect}
                   isShadow={false}
-                  label={ZONE_LABELS[zone]}
+                  label={zoneLabels[zone]}
                 />
               ))}
             </div>
           ))}
         </div>
 
-        {/* Right shadow: zone 14 오른쪽 유인구 */}
+        {/* Right shadow: zone 14 */}
         <div className="flex flex-col items-center gap-0.5">
           <span className="text-[9px] text-slate-500 mb-0.5">{rightLabel}</span>
           <ZoneButton
@@ -151,12 +154,12 @@ export default function ZoneHeatmap({
             selected={selectedZone === 14}
             onSelect={onZoneSelect}
             isShadow
-            label={ZONE_LABELS[14]}
+            label={zoneLabels[14]}
           />
         </div>
       </div>
 
-      {/* Shadow bottom: zone 12 로우볼 */}
+      {/* Shadow bottom: zone 12 */}
       <div className={`flex ${s.gap} justify-center mt-1`}>
         <ZoneButton
           zone={12}
@@ -165,13 +168,13 @@ export default function ZoneHeatmap({
           selected={selectedZone === 12}
           onSelect={onZoneSelect}
           isShadow
-          label={ZONE_LABELS[12]}
+          label={zoneLabels[12]}
         />
       </div>
 
       {/* Batter side indicator */}
       <p className="text-slate-500 text-[10px] mt-2">
-        {batSide === 'L' ? '좌타자' : '우타자'} 상대 중
+        {batSide === 'L' ? t('zoneMap.facingLhb') : t('zoneMap.facingRhb')}
       </p>
     </div>
   );

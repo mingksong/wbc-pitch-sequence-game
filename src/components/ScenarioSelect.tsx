@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import type { ScenarioMode } from '../data/lorenzenScenarios';
 
 interface ScenarioSelectProps {
@@ -7,6 +8,8 @@ interface ScenarioSelectProps {
 }
 
 export default function ScenarioSelect({ scenarios, onSelect, onBack }: ScenarioSelectProps) {
+  const { t, lang } = useLanguage();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
@@ -15,12 +18,12 @@ export default function ScenarioSelect({ scenarios, onSelect, onBack }: Scenario
           onClick={onBack}
           className="text-slate-400 hover:text-white text-sm mb-6 flex items-center gap-1 transition-colors"
         >
-          ← 모드 선택
+          {t('scenario.backToMode')}
         </button>
 
-        <h2 className="text-2xl font-black text-white mb-2 text-center">시나리오 모드</h2>
+        <h2 className="text-2xl font-black text-white mb-2 text-center">{t('scenario.title')}</h2>
         <p className="text-slate-400 text-sm mb-6 text-center">
-          실제 WBC 명장면의 투수가 되어보세요
+          {t('scenario.subtitle')}
         </p>
 
         <div className="space-y-3">
@@ -33,18 +36,22 @@ export default function ScenarioSelect({ scenarios, onSelect, onBack }: Scenario
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <div className="text-2xl mb-1">{sc.flag} vs {sc.opponentFlag}</div>
-                  <div className="text-white font-black text-lg">{sc.nameKo}</div>
+                  <div className="text-white font-black text-lg">{lang === 'ko' ? sc.nameKo : sc.name}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-slate-500 text-xs">{sc.matchDate}</div>
-                  <div className="text-emerald-400 text-xs font-semibold">{sc.matchResult}</div>
+                  <div className="text-emerald-400 text-xs font-semibold">
+                    {(() => { const k = 'scenario.matchResult.' + sc.id; const v = t(k); return v !== k ? v : sc.matchResult; })()}
+                  </div>
                 </div>
               </div>
-              <p className="text-slate-300 text-sm mb-2">{sc.description}</p>
+              <p className="text-slate-300 text-sm mb-2">
+                {lang === 'ko' ? sc.description : (t('scenario.desc.' + sc.id) || sc.description)}
+              </p>
               <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>{sc.pitcherLine}</span>
+                <span>{(() => { const k = 'scenario.pitcherLine.' + sc.id; const v = t(k); return v !== k ? v : sc.pitcherLine; })()}</span>
                 <span>|</span>
-                <span>랜덤 {sc.selectCount}타석</span>
+                <span>{t('scenario.randomAtBats').replace('{n}', String(sc.selectCount))}</span>
               </div>
             </button>
           ))}
@@ -52,7 +59,7 @@ export default function ScenarioSelect({ scenarios, onSelect, onBack }: Scenario
 
         {/* Coming soon placeholder */}
         <div className="mt-4 p-4 rounded-xl border border-dashed border-slate-700 text-center">
-          <p className="text-slate-600 text-sm">더 많은 시나리오가 추가될 예정입니다</p>
+          <p className="text-slate-600 text-sm">{t('scenario.comingSoon')}</p>
         </div>
       </div>
     </div>

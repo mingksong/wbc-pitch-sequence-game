@@ -39,3 +39,24 @@ const PITCH_NAMES_KO: Record<string, string> = {
 export function getPitchNameKo(code: string): string {
   return PITCH_NAMES_KO[code] || code;
 }
+
+const PITCH_NAMES_EN: Record<string, string> = {
+  FF: '4-Seam Fastball',
+  SI: 'Sinker',
+  FC: 'Cutter',
+  SL: 'Slider',
+  ST: 'Sweeper',
+  CU: 'Curveball',
+  KC: 'Knuckle Curve',
+  CH: 'Changeup',
+  FS: 'Splitter',
+  KN: 'Knuckleball',
+  EP: 'Eephus',
+  SC: 'Screwball',
+  SV: 'Slurve',
+  UN: 'Unknown',
+};
+
+export function getPitchNameEn(code: string): string {
+  return PITCH_NAMES_EN[code] || code;
+}

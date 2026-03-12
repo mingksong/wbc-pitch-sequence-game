@@ -1,5 +1,5 @@
 import type { BatterProfile, AtBatOutcome, PitchRecord, PitchOutcome } from '../data/types';
-import { getPitchNameKo } from '../utils/pitchColors';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface AtBatResultProps {
   batter: BatterProfile;
@@ -30,29 +30,20 @@ function pitchEmoji(outcome: PitchOutcome): string {
   }
 }
 
-function outcomeLabel(outcome: AtBatOutcome): { text: string; color: string } {
+function outcomeLabel(outcome: AtBatOutcome, t: (k: string) => string): { text: string; color: string } {
   switch (outcome.type) {
     case 'strikeout':
-      return { text: '삼진!', color: 'text-green-400' };
+      return { text: t('atBat.strikeout'), color: 'text-green-400' };
     case 'walk':
-      return { text: '볼넷 허용', color: 'text-yellow-400' };
+      return { text: t('atBat.walk'), color: 'text-yellow-400' };
     case 'out': {
-      const labels: Record<string, string> = {
-        groundout: '땅볼 아웃!',
-        flyout: '뜬공 아웃!',
-        lineout: '라인드라이브 아웃!',
-      };
-      return { text: labels[outcome.result] || '아웃!', color: 'text-green-400' };
+      const key = 'atBat.' + outcome.result;
+      return { text: t(key) || t('atBat.out'), color: 'text-green-400' };
     }
     case 'hit': {
-      const labels: Record<string, string> = {
-        single: '안타 허용',
-        double: '2루타 허용',
-        triple: '3루타 허용',
-        homerun: '홈런 허용!!!',
-      };
+      const key = 'atBat.' + outcome.result;
       return {
-        text: labels[outcome.result] || '안타 허용',
+        text: t(key) || t('atBat.hit'),
         color: outcome.result === 'homerun' ? 'text-red-300' : 'text-red-400',
       };
     }
@@ -82,13 +73,14 @@ export default function AtBatResult({
   onNext,
   isLastAtBat,
 }: AtBatResultProps) {
-  const { text, color } = outcomeLabel(outcome);
+  const { t, playerName, pitchName } = useLanguage();
+  const { text, color } = outcomeLabel(outcome, t);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-6 max-w-md w-full text-center">
         {/* Batter name */}
-        <p className="text-slate-400 text-sm mb-1">vs {batter.nameKo}</p>
+        <p className="text-slate-400 text-sm mb-1">vs {playerName(batter.nameKo, batter.id)}</p>
 
         {/* Outcome */}
         <h2 className={`text-3xl font-black ${color} mb-1`}>{text}</h2>
@@ -98,7 +90,7 @@ export default function AtBatResult({
 
         {/* Pitch sequence */}
         <div className="bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 mb-4">
-          <p className="text-xs text-slate-400 mb-2">투구 시퀀스</p>
+          <p className="text-xs text-slate-400 mb-2">{t('atBat.pitchSequence')}</p>
           <div className="flex items-center justify-center gap-1 mb-2 text-xl">
             {pitchHistory.map((p, i) => (
               <span key={i}>{pitchEmoji(p.outcome)}</span>
@@ -107,7 +99,7 @@ export default function AtBatResult({
           <div className="flex flex-wrap justify-center gap-1">
             {pitchHistory.map((p, i) => (
               <span key={i} className="text-[10px] text-slate-500">
-                {getPitchNameKo(p.pitchCode)}
+                {pitchName(p.pitchCode)}
               </span>
             ))}
           </div>
@@ -115,7 +107,7 @@ export default function AtBatResult({
 
         {/* Score */}
         <div className="bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 mb-4">
-          <p className="text-xs text-slate-400 mb-1">이번 타석 점수</p>
+          <p className="text-xs text-slate-400 mb-1">{t('atBat.score')}</p>
           <p className="text-amber-400 font-black text-2xl">
             +{totalScore.toLocaleString()}
           </p>
@@ -124,7 +116,7 @@ export default function AtBatResult({
         {/* Actual result comparison (Japan mode only) */}
         {scenarioActualResult && (
           <div className="bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 mb-6">
-            <p className="text-xs text-slate-400 mb-1">실제 결과</p>
+            <p className="text-xs text-slate-400 mb-1">{t('atBat.actualResult')}</p>
             <p className="text-slate-200 text-sm font-medium">{scenarioActualResult}</p>
           </div>
         )}
@@ -134,7 +126,7 @@ export default function AtBatResult({
           onClick={onNext}
           className="w-full bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold text-lg py-3.5 rounded-xl transition-all duration-150 shadow-lg shadow-amber-500/20"
         >
-          {isLastAtBat ? '최종 결과 보기' : '다음 타석'}
+          {isLastAtBat ? t('atBat.viewFinal') : t('atBat.nextAtBat')}
         </button>
       </div>
     </div>

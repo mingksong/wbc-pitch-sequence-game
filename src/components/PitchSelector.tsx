@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { PitchOption, Zone } from '../data/types';
 import { getPitchColor } from '../utils/pitchColors';
 import ZoneHeatmap from './ZoneHeatmap';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface PitchSelectorProps {
   pitches: PitchOption[];
@@ -19,6 +20,13 @@ export default function PitchSelector({
   strikes,
 }: PitchSelectorProps) {
   const [selectedPitch, setSelectedPitch] = useState<PitchOption | null>(null);
+  const { t, pitchName } = useLanguage();
+
+  function movementLabel(movement: string): string {
+    const key = 'pitchMovement.' + movement;
+    const val = t(key);
+    return val !== key ? val : movement;
+  }
 
   if (!selectedPitch) {
     // Step 1: Pick pitch type
@@ -27,7 +35,7 @@ export default function PitchSelector({
         <div className="max-w-md w-full">
           {/* Count display */}
           <div className="text-center mb-6">
-            <p className="text-slate-400 text-sm mb-1">카운트</p>
+            <p className="text-slate-400 text-sm mb-1">{t('pitch.count')}</p>
             <p className="text-white text-3xl font-black font-mono">
               <span className="text-green-400">{balls}</span>
               <span className="text-slate-500"> - </span>
@@ -36,7 +44,7 @@ export default function PitchSelector({
           </div>
 
           <h3 className="text-white text-lg font-bold text-center mb-4">
-            구종을 선택하세요
+            {t('pitch.selectPitch')}
           </h3>
 
           <div className="grid grid-cols-2 gap-3">
@@ -55,14 +63,14 @@ export default function PitchSelector({
                       style={{ backgroundColor: color }}
                     />
                     <span className="text-white font-bold text-base">
-                      {pitch.nameKo}
+                      {pitchName(pitch.code)}
                     </span>
                   </div>
                   <p className="text-slate-400 text-xs">
                     {pitch.avgSpeed} km/h
                   </p>
                   <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1">
-                    {pitch.movement}
+                    {movementLabel(pitch.movement)}
                   </p>
                 </button>
               );
@@ -85,7 +93,7 @@ export default function PitchSelector({
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: color }}
           />
-          <span className="text-white font-bold">{selectedPitch.nameKo}</span>
+          <span className="text-white font-bold">{pitchName(selectedPitch.code)}</span>
           <span className="text-slate-400 text-sm">{selectedPitch.avgSpeed} km/h</span>
         </div>
 
@@ -94,7 +102,7 @@ export default function PitchSelector({
           onClick={() => setSelectedPitch(null)}
           className="text-slate-400 hover:text-white text-xs mb-4 underline underline-offset-2 transition-colors"
         >
-          구종 변경
+          {t('pitch.changePitch')}
         </button>
 
         {/* Count */}
@@ -107,7 +115,7 @@ export default function PitchSelector({
         </div>
 
         <h3 className="text-white text-lg font-bold text-center mb-4">
-          코스를 선택하세요
+          {t('pitch.selectZone')}
         </h3>
 
         {/* Zone grid (pitcher's perspective, blind) */}

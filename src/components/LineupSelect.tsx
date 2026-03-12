@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import type { DomLineup, BatterProfile } from '../data/types';
 
 interface LineupSelectProps {
@@ -8,6 +9,18 @@ interface LineupSelectProps {
 }
 
 export default function LineupSelect({ lineups, batterProfiles, onSelect, onBack }: LineupSelectProps) {
+  const { t, lang, playerName } = useLanguage();
+
+  function lineupName(lineup: DomLineup): string {
+    return lang === 'en' ? lineup.name : lineup.nameKo;
+  }
+
+  function lineupDesc(lineup: DomLineup): string {
+    const key = 'lineup.desc.' + lineup.id;
+    const val = t(key);
+    return val !== key ? val : lineup.description;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center px-4 py-8">
       {/* Back button */}
@@ -17,15 +30,15 @@ export default function LineupSelect({ lineups, batterProfiles, onSelect, onBack
           className="text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-1"
         >
           <span>&#8592;</span>
-          <span>뒤로</span>
+          <span>{t('lineup.back')}</span>
         </button>
       </div>
 
       {/* Header */}
       <div className="text-center mb-8 w-full max-w-lg">
         <div className="w-16 h-0.5 bg-amber-500 mx-auto mb-6 rounded-full" />
-        <h1 className="text-3xl font-black text-white mb-2">상대 라인업을 선택하세요</h1>
-        <p className="text-slate-400 text-sm">도미니카 타선 구성을 고르세요</p>
+        <h1 className="text-3xl font-black text-white mb-2">{t('lineup.title')}</h1>
+        <p className="text-slate-400 text-sm">{t('lineup.subtitle')}</p>
       </div>
 
       {/* Lineup cards */}
@@ -38,8 +51,8 @@ export default function LineupSelect({ lineups, batterProfiles, onSelect, onBack
           >
             {/* Lineup name & description */}
             <div className="mb-3">
-              <h2 className="text-white font-black text-xl mb-1">{lineup.nameKo}</h2>
-              <p className="text-slate-400 text-sm">{lineup.description}</p>
+              <h2 className="text-white font-black text-xl mb-1">{lineupName(lineup)}</h2>
+              <p className="text-slate-400 text-sm">{lineupDesc(lineup)}</p>
             </div>
 
             {/* Divider */}
@@ -55,7 +68,7 @@ export default function LineupSelect({ lineups, batterProfiles, onSelect, onBack
                     <span className="text-slate-500 font-mono w-4 text-right flex-shrink-0">
                       {index + 1}
                     </span>
-                    <span className="text-white font-semibold flex-1">{batter.nameKo}</span>
+                    <span className="text-white font-semibold flex-1">{playerName(batter.nameKo, batterId)}</span>
                     <span
                       className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
                         batter.bats === 'R'

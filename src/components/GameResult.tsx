@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '../i18n/LanguageContext';
 import type { AtBatOutcome, PitchOutcome, Difficulty } from '../data/types';
 import type { AtBatSummary } from '../utils/scoring';
 import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE, calculateBaselineScore, SCENARIO_MAX_SCORE } from '../utils/scoring';
@@ -39,21 +40,6 @@ function pitchEmoji(outcome: PitchOutcome): string {
   }
 }
 
-function outcomeLabel(outcome: AtBatOutcome): string {
-  switch (outcome.type) {
-    case 'strikeout': return '삼진';
-    case 'walk': return '볼넷';
-    case 'out': {
-      const labels: Record<string, string> = { groundout: '땅볼', flyout: '뜬공', lineout: '라인아웃' };
-      return labels[outcome.result] || '아웃';
-    }
-    case 'hit': {
-      const labels: Record<string, string> = { single: '안타', double: '2루타', triple: '3루타', homerun: '홈런' };
-      return labels[outcome.result] || '안타';
-    }
-  }
-}
-
 function gradeColor(grade: string): string {
   switch (grade) {
     case 'S': return 'text-amber-300';
@@ -66,12 +52,30 @@ function gradeColor(grade: string): string {
 }
 
 export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore, scenarioMode, selectedAtBats }: GameResultProps) {
+  const { t, lang, playerName } = useLanguage();
   const [copied, setCopied] = useState(false);
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES };
   const maxScore = gameMode === 'scenario' ? SCENARIO_MAX_SCORE : gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
   const isHard = difficulty === 'hard';
-  const { grade, label } = getGrade(totalScore, maxScore);
+  const { grade } = getGrade(totalScore, maxScore);
   const pct = Math.round((totalScore / maxScore) * 100);
+
+  function outcomeLabel(outcome: AtBatOutcome): string {
+    switch (outcome.type) {
+      case 'strikeout': return lang === 'ko' ? '삼진' : 'K';
+      case 'walk': return lang === 'ko' ? '볼넷' : 'BB';
+      case 'out': {
+        const ko: Record<string, string> = { groundout: '땅볼', flyout: '뜬공', lineout: '라인아웃' };
+        const en: Record<string, string> = { groundout: 'GO', flyout: 'FO', lineout: 'LO' };
+        return (lang === 'ko' ? ko : en)[outcome.result] || (lang === 'ko' ? '아웃' : 'Out');
+      }
+      case 'hit': {
+        const ko: Record<string, string> = { single: '안타', double: '2루타', triple: '3루타', homerun: '홈런' };
+        const en: Record<string, string> = { single: '1B', double: '2B', triple: '3B', homerun: 'HR' };
+        return (lang === 'ko' ? ko : en)[outcome.result] || (lang === 'ko' ? '안타' : 'Hit');
+      }
+    }
+  }
 
   // Scenario mode: calculate Lorenzen's baseline score for the same at-bats
   const baselineScore = (gameMode === 'scenario' && selectedAtBats)
@@ -80,7 +84,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
   const beatBaseline = baselineScore !== null && totalScore > baselineScore;
 
   const handleCopy = async () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore, lang);
     const ok = await copyShareText(text);
     if (ok) {
       setCopied(true);
@@ -89,26 +93,28 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
   };
 
   const handleShareX = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore, lang);
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleShareThreads = () => {
-    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore, lang);
     const url = `https://www.threads.net/intent/post?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
+
+  const resultTitle = gameMode === 'scenario'
+    ? (lang === 'ko' ? scenarioMode?.nameKo : scenarioMode?.name) ?? t('result.scenarioTitle')
+    : gameMode === 'dom' ? t('result.domTitle') : t('result.japanTitle');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         {/* Title */}
         <h2 className="text-center text-lg text-slate-400 mb-1">
-          {gameMode === 'scenario'
-            ? (scenarioMode?.nameKo ?? '시나리오 결과')
-            : gameMode === 'dom' ? '도미니카 챌린지 결과' : '오늘의 포수 성적표'}
-          {isHard && <span className="ml-1 text-red-400">&#x1F525; 하드모드</span>}
+          {resultTitle}
+          {isHard && <span className="ml-1 text-red-400">{t('result.hardMode')}</span>}
         </h2>
 
         {/* Grade */}
@@ -116,7 +122,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
           <p className={`text-7xl font-black ${gradeColor(grade)} mb-1`}>
             {grade}{isHard ? ' \uD83D\uDD25' : ''}
           </p>
-          <p className="text-slate-300 font-medium text-lg">{label}</p>
+          <p className="text-slate-300 font-medium text-lg">{t('grade.' + grade)}</p>
         </div>
 
         {/* Score */}
@@ -138,21 +144,25 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
         {gameMode === 'scenario' && baselineScore !== null && (
           <div className={`border-2 rounded-xl px-4 py-4 mb-6 text-center ${beatBaseline ? 'border-emerald-500 bg-emerald-900/20' : 'border-red-500 bg-red-900/20'}`}>
             <p className={`text-2xl font-black mb-1 ${beatBaseline ? 'text-emerald-400' : 'text-red-400'}`}>
-              {beatBaseline ? '당신의 승리!' : `${pitcherName ?? '투수'}의 승리!`}
+              {beatBaseline
+                ? t('result.yourVictory')
+                : t('result.pitcherVictory').replace('{name}', playerName(pitcherName ?? '', scenarioMode?.pitcherId ?? '') || t('result.realPitcher'))}
             </p>
             <div className="flex items-center justify-center gap-4 mt-2">
               <div>
-                <p className="text-slate-400 text-xs">당신</p>
+                <p className="text-slate-400 text-xs">{t('result.you')}</p>
                 <p className="text-amber-400 font-black text-xl">{totalScore.toLocaleString()}</p>
               </div>
               <p className="text-slate-500 font-bold text-lg">vs</p>
               <div>
-                <p className="text-slate-400 text-xs">{pitcherName ?? '실제 투수'}</p>
+                <p className="text-slate-400 text-xs">{playerName(pitcherName ?? '', scenarioMode?.pitcherId ?? '') || t('result.realPitcher')}</p>
                 <p className="text-emerald-400 font-black text-xl">{baselineScore.toLocaleString()}</p>
               </div>
             </div>
             <p className="text-slate-500 text-[10px] mt-2">
-              {scenarioMode?.pitcherLine} | {scenarioMode?.matchResult}
+              {scenarioMode ? (() => { const k = 'scenario.pitcherLine.' + scenarioMode.id; const v = t(k); return v !== k ? v : scenarioMode.pitcherLine; })() : ''}
+              {' | '}
+              {scenarioMode ? (() => { const k = 'scenario.matchResult.' + scenarioMode.id; const v = t(k); return v !== k ? v : scenarioMode.matchResult; })() : ''}
             </p>
           </div>
         )}
@@ -160,7 +170,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
         {/* Catcher Lead Score */}
         {leadScore && (
           <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3 mb-6 text-center">
-            <p className="text-slate-400 text-xs mb-1">포수 리드 지수</p>
+            <p className="text-slate-400 text-xs mb-1">{t('result.leadScoreTitle')}</p>
             <p className="text-xl font-bold text-white">
               {leadScore.grade} {leadScore.label}
             </p>
@@ -168,7 +178,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
               dRE: {leadScore.totalDRE > 0 ? '+' : ''}{leadScore.totalDRE.toFixed(3)}
             </p>
             <p className="text-slate-500 text-[10px] mt-1">
-              음수일수록 투수에게 유리한 배합
+              {t('result.leadScoreHint')}
             </p>
           </div>
         )}
@@ -184,7 +194,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
               >
                 <div>
                   <p className="text-white font-medium text-sm">
-                    {batter?.nameKo || ab.batterId}
+                    {playerName(batter?.nameKo || ab.batterId, ab.batterId)}
                   </p>
                   <div className="flex items-center gap-0.5 mt-0.5">
                     {ab.pitchHistory.map((p, j) => (
@@ -219,7 +229,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
             onClick={handleCopy}
             className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-medium py-2.5 rounded-xl transition-colors text-sm"
           >
-            {copied ? '복사됨!' : '복사'}
+            {copied ? (lang === 'ko' ? '복사됨!' : 'Copied!') : (lang === 'ko' ? '복사' : 'Copy')}
           </button>
         </div>
 
@@ -228,7 +238,7 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
           onClick={onRestart}
           className="w-full bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-900 font-bold text-lg py-3.5 rounded-xl transition-all duration-150 shadow-lg shadow-amber-500/20"
         >
-          다시 도전
+          {t('result.restartButton')}
         </button>
       </div>
     </div>

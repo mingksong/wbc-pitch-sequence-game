@@ -1,4 +1,5 @@
 import type { GameScenario, GameMode } from '../data/types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface HUDProps {
   scenario?: GameScenario;
@@ -49,6 +50,7 @@ export default function HUD({
   batterName,
   gameMode,
 }: HUDProps) {
+  const { t } = useLanguage();
   const isDom = gameMode === 'dom';
 
   return (
@@ -63,20 +65,20 @@ export default function HUD({
           </div>
         ) : (
           <div className="flex items-center gap-1">
-            <span className="text-blue-400 font-bold">한 {scenario?.scoreKor}</span>
+            <span className="text-blue-400 font-bold">{t('hud.kor')} {scenario?.scoreKor}</span>
             <span className="text-slate-500">-</span>
-            <span className="text-red-400 font-bold">{scenario?.scoreJpn} 일</span>
+            <span className="text-red-400 font-bold">{scenario?.scoreJpn} {t('hud.jpn')}</span>
           </div>
         )}
 
         {/* Inning / at-bat order */}
         {isDom ? (
           <div className="text-slate-300 text-xs">
-            타순 {currentAtBat}/{totalAtBats}
+            {t('hud.battingOrder').replace('{current}', String(currentAtBat)).replace('{total}', String(totalAtBats))}
           </div>
         ) : (
           <div className="text-slate-300 text-xs">
-            {scenario?.inning}회{scenario?.halfInning === 'top' ? '초' : '말'}
+            {t('hud.inning').replace('{n}', String(scenario?.inning))} {scenario?.halfInning === 'top' ? t('hud.top') : t('hud.bottom')}
           </div>
         )}
 
@@ -94,7 +96,7 @@ export default function HUD({
           )}
           <p className="text-white text-xs font-medium">{pitcherName}</p>
           {!isDom && (
-            <p className="text-slate-400 text-[10px]">{currentAtBat} / {totalAtBats} 타석</p>
+            <p className="text-slate-400 text-[10px]">{t('hud.atBatProgress').replace('{current}', String(currentAtBat)).replace('{total}', String(totalAtBats))}</p>
           )}
         </div>
       </div>

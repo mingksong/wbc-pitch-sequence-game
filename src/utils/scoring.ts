@@ -3,6 +3,21 @@ import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
 import { RUN_VALUE_MATRIX } from '../data/runValueMatrix';
+import { ko } from '../i18n/ko';
+import { en } from '../i18n/en';
+
+// Helper to get translation
+function tr(key: string, lang: 'ko' | 'en'): string {
+  const dict = lang === 'en' ? en : ko;
+  return (dict as Record<string, string>)[key] ?? (ko as Record<string, string>)[key] ?? key;
+}
+
+function getLeadLabelKey(totalDRE: number): string {
+  if (totalDRE <= -0.5) return 'lead.mlb';
+  if (totalDRE <= -0.2) return 'lead.stable';
+  if (totalDRE <= 0) return 'lead.decent';
+  return 'lead.risky';
+}
 
 // Score per pitch outcome (0-100)
 // Design: 5-at-bat game, "3 outs + 1K + 1 hit" → B grade
@@ -71,7 +86,7 @@ export interface LeadScoreResult {
 
 // Calculate catcher lead score from pitch history across all at-bats
 // Each pitch's (count, actualZone) is looked up in RUN_VALUE_MATRIX
-export function calculateLeadScore(atBats: AtBatSummary[]): LeadScoreResult {
+export function calculateLeadScore(atBats: AtBatSummary[], lang: 'ko' | 'en' = 'ko'): LeadScoreResult {
   let totalDRE = 0;
   let pitchCount = 0;
 
@@ -100,20 +115,19 @@ export function calculateLeadScore(atBats: AtBatSummary[]): LeadScoreResult {
     }
   }
 
+  void pitchCount; // suppress unused var warning
+
   // Classify lead quality
-  let label: string;
+  const labelKey = getLeadLabelKey(totalDRE);
+  const label = tr(labelKey, lang);
   let grade: string;
   if (totalDRE <= -0.5) {
-    label = 'MLB급 리드';
     grade = '\u2B50'; // star
   } else if (totalDRE <= -0.2) {
-    label = '안정적 리드';
     grade = '\uD83D\uDFE2'; // green circle
   } else if (totalDRE <= 0) {
-    label = '무난한 리드';
     grade = '\uD83D\uDFE1'; // yellow circle
   } else {
-    label = '위험한 리드';
     grade = '\uD83D\uDD34'; // red circle
   }
 
@@ -139,14 +153,18 @@ export function calculateBaselineScore(actualOutcomes: AtBatOutcome[]): number {
 // Grade thresholds:
 // DOM 기준: 9K=90%→S, 6K+3아웃=82%→S, 9아웃=67%→A
 // Japan 기준: 5K=100%→S, 3K+2아웃=90%→S, 5아웃=75%→A
-export function getGrade(score: number, maxScore: number = MAX_SCORE): { grade: string; label: string } {
+export function getGrade(score: number, maxScore: number = MAX_SCORE, lang: 'ko' | 'en' = 'ko'): { grade: string; label: string } {
   const pct = score / maxScore;
-  if (pct >= 0.80) return { grade: 'S', label: '명포수' };
-  if (pct >= 0.65) return { grade: 'A', label: '시리즈 MVP급' };
-  if (pct >= 0.50) return { grade: 'B', label: '1군 주전 자격 있음' };
-  if (pct >= 0.35) return { grade: 'C', label: '2군 복귀각' };
-  if (pct >= 0.20) return { grade: 'D', label: '감독 눈치 보는 중' };
-  return { grade: 'F', label: '벤치 직행' };
+  let grade: string;
+  if (pct >= 0.80) grade = 'S';
+  else if (pct >= 0.65) grade = 'A';
+  else if (pct >= 0.50) grade = 'B';
+  else if (pct >= 0.35) grade = 'C';
+  else if (pct >= 0.20) grade = 'D';
+  else grade = 'F';
+
+  const label = tr('grade.' + grade, lang);
+  return { grade, label };
 }
 
 // Emoji for pitch result
@@ -170,18 +188,12 @@ function pitchEmoji(outcome: PitchOutcome): string {
 }
 
 // At-bat result text
-function atBatResultText(outcome: AtBatOutcome): string {
+function atBatResultText(outcome: AtBatOutcome, lang: 'ko' | 'en'): string {
   switch (outcome.type) {
-    case 'strikeout': return '삼진!';
-    case 'walk': return '볼넷 허용';
-    case 'out': {
-      const labels: Record<string, string> = { groundout: '땅볼 아웃', flyout: '뜬공 아웃', lineout: '라인드라이브 아웃' };
-      return labels[outcome.result] || '아웃!';
-    }
-    case 'hit': {
-      const labels: Record<string, string> = { single: '안타 허용', double: '2루타 허용', triple: '3루타 허용', homerun: '홈런 허용' };
-      return labels[outcome.result] || '안타 허용';
-    }
+    case 'strikeout': return tr('share.strikeout', lang);
+    case 'walk': return tr('share.walk', lang);
+    case 'out': return tr('share.' + outcome.result, lang) || tr('share.out', lang);
+    case 'hit': return tr('share.' + outcome.result, lang) || tr('share.hit', lang);
   }
 }
 
@@ -193,31 +205,47 @@ export function generateShareText(
   pitcherName?: string,
   isHard: boolean = false,
   leadScore?: LeadScoreResult,
+  lang: 'ko' | 'en' = 'ko',
 ): string {
   const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES };
   const maxScore = mode === 'scenario' ? SCENARIO_MAX_SCORE : mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
-  const { grade, label } = getGrade(totalScore, maxScore);
+  const { grade, label } = getGrade(totalScore, maxScore, lang);
 
-  const hardTag = isHard ? ' [\uD83D\uDD25하드모드]' : '';
+  const hardTag = isHard ? tr('share.hardTag', lang) : '';
   let header: string[];
   if (mode === 'scenario') {
-    header = [`\u26BE ${pitcherName ? pitcherName + '을 이겨라!' : '시나리오 모드'}${hardTag}`, '\uD83C\uDDEE\uD83C\uDDF9 이탈리아 vs 미국 \uD83C\uDDFA\uD83C\uDDF8 WBC 2026'];
+    const scenarioTitle = pitcherName
+      ? `\u26BE ${pitcherName}${hardTag}`
+      : `\u26BE ${lang === 'en' ? 'Scenario Mode' : '시나리오 모드'}${hardTag}`;
+    header = [scenarioTitle, tr('share.scenarioSubheader', lang)];
   } else if (mode === 'japan') {
-    header = [`\u26BE 답답하면 니가 던지던가${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026'];
+    header = [tr('share.japanHeader', lang) + hardTag, tr('share.japanSubheader', lang)];
   } else {
-    header = [`\u26BE 도전! 도미니카!${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
+    header = [
+      tr('share.domHeader', lang) + hardTag,
+      tr('share.domSubheader', lang),
+      pitcherName ? tr('share.pitcher', lang).replace('{name}', pitcherName) : '',
+    ];
   }
 
   const lines = atBats.map((ab) => {
     const batter = allProfiles[ab.batterId];
     const emojis = ab.pitchHistory.map(p => pitchEmoji(p.outcome)).join('');
-    const result = atBatResultText(ab.outcome);
-    return `${batter?.nameKo || ab.batterId}: ${emojis}  ${result}`;
+    const result = atBatResultText(ab.outcome, lang);
+    const batterName = lang === 'en'
+      ? ((en as Record<string, string>)['player.' + ab.batterId] || batter?.nameKo || ab.batterId)
+      : (batter?.nameKo || ab.batterId);
+    return `${batterName}: ${emojis}  ${result}`;
   });
 
-  const scoreText = `최종: ${grade}등급 | ${totalScore.toLocaleString()}점`;
+  const scoreText = tr('share.final', lang).replace('{grade}', grade).replace('{score}', totalScore.toLocaleString());
 
-  const leadLine = leadScore ? `포수 리드: ${leadScore.grade} ${leadScore.label} (${leadScore.totalDRE > 0 ? '+' : ''}${leadScore.totalDRE.toFixed(3)})` : '';
+  const leadLine = leadScore
+    ? tr('share.leadScore', lang)
+        .replace('{grade}', leadScore.grade)
+        .replace('{label}', leadScore.label)
+        .replace('{dre}', (leadScore.totalDRE > 0 ? '+' : '') + leadScore.totalDRE.toFixed(3))
+    : '';
 
   return [
     ...header.filter(Boolean),
@@ -228,7 +256,7 @@ export function generateShareText(
     `"${label}"`,
     ...(leadLine ? [leadLine] : []),
     '',
-    '나도 도전 \u2192 [URL]',
+    tr('share.tryLink', lang),
   ].join('\n');
 }
 

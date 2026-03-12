@@ -35,10 +35,12 @@ import LineupSelect from './components/LineupSelect';
 import DifficultySelect from './components/DifficultySelect';
 import MissNotify from './components/MissNotify';
 import ScenarioSelect from './components/ScenarioSelect';
+import LanguageToggle from './components/LanguageToggle';
 import { SCENARIO_MODES } from './data/lorenzenScenarios';
 import type { ScenarioMode, ScenarioAtBat } from './data/lorenzenScenarios';
 import { LORENZEN_PROFILE } from './data/lorenzenProfile';
 import { USA_BATTER_PROFILES } from './data/usaBatterProfiles';
+import { useLanguage } from './i18n/LanguageContext';
 
 const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
 
@@ -97,6 +99,7 @@ function updateCount(
 }
 
 export default function App() {
+  const { lang, playerName, t } = useLanguage();
   const [phase, setPhase] = useState<GamePhase>('mode_select');
   const [gameMode, setGameMode] = useState<GameMode>('japan');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
@@ -132,7 +135,7 @@ export default function App() {
 
   // Current batter/pitcher based on mode
   let batter: BatterProfile | null = null;
-  let pitcher: { pitches: PitchOption[]; hand: 'L' | 'R'; nameKo: string } | null = null;
+  let pitcher: { pitches: PitchOption[]; hand: 'L' | 'R'; nameKo: string; id: string } | null = null;
   let scenario = undefined as ReturnType<typeof Object.assign> | undefined;
 
   if (gameMode === 'japan') {
@@ -140,18 +143,20 @@ export default function App() {
     scenario = sc;
     batter = sc ? BATTER_PROFILES[sc.batterId] : null;
     const pitcherData = sc ? PITCHER_REPERTOIRE[sc.pitcherId] : null;
-    pitcher = pitcherData ? { pitches: pitcherData.pitches, hand: pitcherData.hand, nameKo: pitcherData.nameKo } : null;
+    pitcher = pitcherData
+      ? { pitches: pitcherData.pitches, hand: pitcherData.hand, nameKo: pitcherData.nameKo, id: sc.pitcherId }
+      : null;
   } else if (gameMode === 'dom' && selectedLineup && selectedPitcher) {
     const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
     batter = batterId ? DOM_BATTER_PROFILES[batterId] : null;
-    pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo };
+    pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo, id: selectedPitcher.id };
   } else if (gameMode === 'scenario' && selectedScenario && selectedAtBats.length > 0) {
     const scenarioAtBat = selectedAtBats[atBat.scenarioIndex];
     if (scenarioAtBat) {
       batter = USA_BATTER_PROFILES[scenarioAtBat.batterId] ?? null;
       // Use the scenario's pitcher profile
       if (selectedScenario.pitcherId === 'lorenzen') {
-        pitcher = { pitches: LORENZEN_PROFILE.pitches, hand: LORENZEN_PROFILE.hand, nameKo: LORENZEN_PROFILE.nameKo };
+        pitcher = { pitches: LORENZEN_PROFILE.pitches, hand: LORENZEN_PROFILE.hand, nameKo: LORENZEN_PROFILE.nameKo, id: LORENZEN_PROFILE.id };
       }
     }
   }
@@ -397,177 +402,193 @@ export default function App() {
   }, []);
 
   // Render based on phase
-  switch (phase) {
-    case 'mode_select':
-      return <ModeSelect onSelectMode={handleSelectMode} />;
+  const content = (() => {
+    switch (phase) {
+      case 'mode_select':
+        return <ModeSelect onSelectMode={handleSelectMode} />;
 
-    case 'difficulty_select':
-      return (
-        <DifficultySelect
-          gameMode={gameMode}
-          onSelect={handleSelectDifficulty}
-          onBack={handleBackToModeSelectFromDifficulty}
-        />
-      );
-
-    case 'intro':
-      return <GameIntro onStart={handleStart} />;
-
-    case 'pitcher_select':
-      return (
-        <PitcherSelect
-          pitchers={KOR_PITCHERS}
-          onSelect={handleSelectPitcher}
-          onBack={handleBackToModeSelect}
-        />
-      );
-
-    case 'lineup_select':
-      return (
-        <LineupSelect
-          lineups={DOM_LINEUPS}
-          batterProfiles={DOM_BATTER_PROFILES}
-          onSelect={handleSelectLineup}
-          onBack={handleBackToPitcherSelect}
-        />
-      );
-
-    case 'scenario_select':
-      return (
-        <ScenarioSelect
-          scenarios={SCENARIO_MODES}
-          onSelect={handleSelectScenario}
-          onBack={handleBackToModeSelectFromScenario}
-        />
-      );
-
-    case 'pitch_select':
-      if (!batter || !pitcher) return null;
-      return (
-        <>
-          <HUD
-            scenario={scenario}
-            balls={atBat.balls}
-            strikes={atBat.strikes}
-            outs={scenario?.outs ?? 0}
-            currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={totalAtBats}
-            pitcherName={pitcher.nameKo}
-            batterName={batter.nameKo}
+      case 'difficulty_select':
+        return (
+          <DifficultySelect
             gameMode={gameMode}
+            onSelect={handleSelectDifficulty}
+            onBack={handleBackToModeSelectFromDifficulty}
           />
-          <PitchSelector
-            pitches={pitcher.pitches}
-            batSide={batter.bats === 'S' ? 'R' : batter.bats}
-            onSelect={handlePitchSelect}
-            balls={atBat.balls}
-            strikes={atBat.strikes}
-          />
-        </>
-      );
+        );
 
-    case 'miss_notify':
-      if (!batter || !pitcher || !lastOutcome) return null;
-      return (
-        <MissNotify
-          targetZone={lastOutcome.zone}
-          actualZone={lastOutcome.actualZone}
-          onDone={handleMissNotifyDone}
-        />
-      );
+      case 'intro':
+        return <GameIntro onStart={handleStart} />;
 
-    case 'animating':
-      if (!batter || !pitcher || !currentTrajectory) return null;
-      return (
-        <>
-          <HUD
-            scenario={scenario}
-            balls={atBat.balls}
-            strikes={atBat.strikes}
-            outs={scenario?.outs ?? 0}
-            currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={totalAtBats}
-            pitcherName={pitcher.nameKo}
-            batterName={batter.nameKo}
-            gameMode={gameMode}
+      case 'pitcher_select':
+        return (
+          <PitcherSelect
+            pitchers={KOR_PITCHERS}
+            onSelect={handleSelectPitcher}
+            onBack={handleBackToModeSelect}
           />
-          <PitchScene
-            pitch={currentTrajectory}
-            isAnimating={true}
-            onAnimationComplete={handleAnimationComplete}
-          />
-        </>
-      );
+        );
 
-    case 'outcome':
-      if (!batter || !pitcher || !lastOutcome) return null;
-      return (
-        <>
-          <HUD
-            scenario={scenario}
-            balls={lastOutcome.newBalls}
-            strikes={lastOutcome.newStrikes}
-            outs={scenario?.outs ?? 0}
-            currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={totalAtBats}
-            pitcherName={pitcher.nameKo}
-            batterName={batter.nameKo}
-            gameMode={gameMode}
+      case 'lineup_select':
+        return (
+          <LineupSelect
+            lineups={DOM_LINEUPS}
+            batterProfiles={DOM_BATTER_PROFILES}
+            onSelect={handleSelectLineup}
+            onBack={handleBackToPitcherSelect}
           />
-          <OutcomeDisplay
-            outcome={lastOutcome.outcome}
-            pitchCode={lastOutcome.pitchCode}
-            zone={lastOutcome.zone}
+        );
+
+      case 'scenario_select':
+        return (
+          <ScenarioSelect
+            scenarios={SCENARIO_MODES}
+            onSelect={handleSelectScenario}
+            onBack={handleBackToModeSelectFromScenario}
+          />
+        );
+
+      case 'pitch_select':
+        if (!batter || !pitcher) return null;
+        return (
+          <>
+            <HUD
+              scenario={scenario}
+              balls={atBat.balls}
+              strikes={atBat.strikes}
+              outs={scenario?.outs ?? 0}
+              currentAtBat={atBat.scenarioIndex + 1}
+              totalAtBats={totalAtBats}
+              pitcherName={playerName(pitcher.nameKo, pitcher.id)}
+              batterName={playerName(batter.nameKo, batter.id)}
+              gameMode={gameMode}
+            />
+            <PitchSelector
+              pitches={pitcher.pitches}
+              batSide={batter.bats === 'S' ? 'R' : batter.bats}
+              onSelect={handlePitchSelect}
+              balls={atBat.balls}
+              strikes={atBat.strikes}
+            />
+          </>
+        );
+
+      case 'miss_notify':
+        if (!batter || !pitcher || !lastOutcome) return null;
+        return (
+          <MissNotify
+            targetZone={lastOutcome.zone}
             actualZone={lastOutcome.actualZone}
-            difficulty={difficulty}
-            batterProfile={batter}
-            balls={lastOutcome.newBalls}
-            strikes={lastOutcome.newStrikes}
-            onNext={handleOutcomeNext}
+            onDone={handleMissNotifyDone}
           />
-        </>
-      );
+        );
 
-    case 'at_bat_result':
-      if (!batter || !atBatOver) return null;
-      return (
-        <AtBatResult
-          batter={batter}
-          outcome={atBatOver.result}
-          pitchHistory={atBat.pitchHistory}
-          totalScore={atBatOver.score}
-          scenarioActualResult={
-            gameMode === 'scenario'
-              ? (selectedAtBats[atBat.scenarioIndex]?.actualResult ?? '')
-              : (scenario?.actualResult ?? '')
-          }
-          onNext={handleAtBatNext}
-          isLastAtBat={atBat.scenarioIndex + 1 >= totalAtBats}
-        />
-      );
+      case 'animating':
+        if (!batter || !pitcher || !currentTrajectory) return null;
+        return (
+          <>
+            <HUD
+              scenario={scenario}
+              balls={atBat.balls}
+              strikes={atBat.strikes}
+              outs={scenario?.outs ?? 0}
+              currentAtBat={atBat.scenarioIndex + 1}
+              totalAtBats={totalAtBats}
+              pitcherName={playerName(pitcher.nameKo, pitcher.id)}
+              batterName={playerName(batter.nameKo, batter.id)}
+              gameMode={gameMode}
+            />
+            <PitchScene
+              pitch={currentTrajectory}
+              isAnimating={true}
+              onAnimationComplete={handleAnimationComplete}
+            />
+          </>
+        );
 
-    case 'game_result': {
-      const total = calculateTotalScore(completedAtBats);
-      const leadScore = calculateLeadScore(completedAtBats);
-      const scenarioPitcherName = gameMode === 'scenario'
-        ? (selectedScenario?.pitcherId === 'lorenzen' ? LORENZEN_PROFILE.nameKo : undefined)
-        : selectedPitcher?.nameKo;
-      return (
-        <GameResult
-          atBats={completedAtBats}
-          totalScore={total}
-          difficulty={difficulty}
-          onRestart={handleRestart}
-          gameMode={gameMode}
-          pitcherName={scenarioPitcherName}
-          leadScore={leadScore}
-          scenarioMode={selectedScenario ?? undefined}
-          selectedAtBats={selectedAtBats}
-        />
-      );
+      case 'outcome':
+        if (!batter || !pitcher || !lastOutcome) return null;
+        return (
+          <>
+            <HUD
+              scenario={scenario}
+              balls={lastOutcome.newBalls}
+              strikes={lastOutcome.newStrikes}
+              outs={scenario?.outs ?? 0}
+              currentAtBat={atBat.scenarioIndex + 1}
+              totalAtBats={totalAtBats}
+              pitcherName={playerName(pitcher.nameKo, pitcher.id)}
+              batterName={playerName(batter.nameKo, batter.id)}
+              gameMode={gameMode}
+            />
+            <OutcomeDisplay
+              outcome={lastOutcome.outcome}
+              pitchCode={lastOutcome.pitchCode}
+              zone={lastOutcome.zone}
+              actualZone={lastOutcome.actualZone}
+              difficulty={difficulty}
+              batterProfile={batter}
+              balls={lastOutcome.newBalls}
+              strikes={lastOutcome.newStrikes}
+              onNext={handleOutcomeNext}
+            />
+          </>
+        );
+
+      case 'at_bat_result':
+        if (!batter || !atBatOver) return null;
+        return (
+          <AtBatResult
+            batter={batter}
+            outcome={atBatOver.result}
+            pitchHistory={atBat.pitchHistory}
+            totalScore={atBatOver.score}
+            scenarioActualResult={(() => {
+              const rawResult = gameMode === 'scenario'
+                ? (selectedAtBats[atBat.scenarioIndex]?.actualResult ?? '')
+                : (scenario?.actualResult ?? '');
+              const atBatId = gameMode === 'scenario'
+                ? (selectedAtBats[atBat.scenarioIndex]?.id ?? '')
+                : (scenario?.id ?? '');
+              if (!atBatId) return rawResult;
+              const key = 'scenario.result.' + atBatId;
+              const val = t(key);
+              return val !== key ? val : rawResult;
+            })()}
+            onNext={handleAtBatNext}
+            isLastAtBat={atBat.scenarioIndex + 1 >= totalAtBats}
+          />
+        );
+
+      case 'game_result': {
+        const total = calculateTotalScore(completedAtBats);
+        const leadScore = calculateLeadScore(completedAtBats, lang);
+        const scenarioPitcherName = gameMode === 'scenario'
+          ? (selectedScenario?.pitcherId === 'lorenzen' ? playerName(LORENZEN_PROFILE.nameKo, LORENZEN_PROFILE.id) : undefined)
+          : selectedPitcher ? playerName(selectedPitcher.nameKo, selectedPitcher.id) : undefined;
+        return (
+          <GameResult
+            atBats={completedAtBats}
+            totalScore={total}
+            difficulty={difficulty}
+            onRestart={handleRestart}
+            gameMode={gameMode}
+            pitcherName={scenarioPitcherName}
+            leadScore={leadScore}
+            scenarioMode={selectedScenario ?? undefined}
+            selectedAtBats={selectedAtBats}
+          />
+        );
+      }
+
+      default:
+        return null;
     }
+  })();
 
-    default:
-      return null;
-  }
+  return (
+    <>
+      <LanguageToggle />
+      {content}
+    </>
+  );
 }
