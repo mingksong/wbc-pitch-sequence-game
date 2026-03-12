@@ -7,7 +7,7 @@ interface DifficultySelectProps {
 }
 
 export default function DifficultySelect({ gameMode, onSelect, onBack }: DifficultySelectProps) {
-  const modeLabel = gameMode === 'japan' ? '한일전' : '도미니카';
+  const modeLabel = gameMode === 'japan' ? '한일전' : gameMode === 'scenario' ? '시나리오' : '도미니카';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-6 text-center">
